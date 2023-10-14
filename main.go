@@ -56,17 +56,19 @@ func main() {
 func addZcan(node ZcanNode) error {
 	zc := zcan.NewZehnderDevice(node.NodeId)
 	if err := zc.Connect(node.Interface); err != nil {
-		log.Println(err)
+		log.Printf("unable to connect to %s for zcan service %s: %s", node.Interface, node.Name, err)
 		return err
 	}
 
 	if err := zc.Start(); err != nil {
-		log.Println(err)
+		log.Printf("unable to start the zcan service %s: %s", zc.Name, err)
 		return err
 	}
 
 	for _, pdo := range node.PDO.PDO {
-		zc.RequestPDOBySlug(node.PDO.Node, pdo.Slug, pdo.Interval)
+		if err := zc.RequestPDOBySlug(node.PDO.Node, pdo.Slug, pdo.Interval); err != nil {
+			log.Printf("unable to add PDO '%s': %s", pdo.Slug, err)
+		}
 	}
 
 	AddEndpoint(JsonEndpoint{fmt.Sprintf("/%s", node.Name), zc.JsonResponse})
