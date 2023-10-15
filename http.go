@@ -30,7 +30,7 @@ func logAvailableEndpoints() {
 	log.Printf("available endpoints: %s", strings.Join(avail, ", "))
 }
 
-func startHttpServer(host string, port int) {
+func startHttpServer(host string, port int) error {
 	log.Printf("Starting HTTP server listening @ http://%s:%d/", host, port)
 	logAvailableEndpoints()
 	mux := http.NewServeMux()
@@ -43,6 +43,7 @@ func startHttpServer(host string, port int) {
 	} else if err != nil {
 		log.Printf("server error: %v\n", err)
 	}
+	return err
 }
 
 var unknownURLs map[string]int = make(map[string]int)

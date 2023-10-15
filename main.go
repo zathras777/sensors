@@ -6,14 +6,17 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"syscall"
 
+	"github.com/zathras777/sensors/pkg/max6675"
 	"github.com/zathras777/sensors/pkg/mdev"
 	"github.com/zathras777/sensors/pkg/zcan"
 )
 
 var setupZcan []*zcan.ZehnderDevice
 var setupModbus []*mdev.ModbusDevice
+var setupMax6675 []*max6675.Max6675Device
 
 func main() {
 	if err := processConfigurationFile("./config.yaml"); err != nil {
@@ -28,24 +31,41 @@ func main() {
 		addModbus(node)
 	}
 
-	if len(setupZcan)+len(setupModbus) == 0 {
+	for _, node := range cfg.Max6675 {
+		addMax6675(node)
+	}
+
+	if len(setupZcan)+len(setupModbus)+len(setupMax6675) == 0 {
 		log.Fatal("Unable to configure any services. Nothing to do? Exiting")
 	}
 
-	go startHttpServer(cfg.Http.Address, cfg.Http.Port)
-
 	sigs := make(chan os.Signal, 1)
+	failedHttp := make(chan bool, 1)
 	waiter := make(chan bool, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-sigs
+		if err := startHttpServer(cfg.Http.Address, cfg.Http.Port); err != nil {
+			failedHttp <- true
+		}
+	}()
+
+	go func() {
+		select {
+		case <-sigs:
+			break
+		case <-failedHttp:
+			log.Println("failed to start the HTTP server, exiting...")
+		}
 		httpServer.Close()
 		for _, zc := range setupZcan {
 			zc.Stop()
 		}
 		for _, md := range setupModbus {
 			md.Stop()
+		}
+		for _, m6 := range setupMax6675 {
+			m6.Stop()
 		}
 		waiter <- true
 	}()
@@ -73,9 +93,9 @@ func addZcan(node ZcanNode) error {
 			log.Printf("unable to add PDO '%s': %s", pdo.Slug, err)
 		}
 	}
-
-	AddEndpoint(JsonEndpoint{fmt.Sprintf("/%s", node.Name), zc.JsonResponse})
-	AddEndpoint(JsonEndpoint{fmt.Sprintf("/%s/device-info", node.Name), zc.JsonDeviceInfo})
+	slug := endpointSlugify(node.Name)
+	AddEndpoint(JsonEndpoint{slug, zc.JsonResponse})
+	AddEndpoint(JsonEndpoint{fmt.Sprintf("%s/device-info", slug), zc.JsonDeviceInfo})
 	log.Printf("zcan service %s setup OK", node.Name)
 	setupZcan = append(setupZcan, zc)
 	return nil
@@ -103,8 +123,26 @@ func addModbus(node ModbusNode) error {
 
 	md.ReadOnce()
 	md.Start(node.Interval)
-	AddEndpoint(JsonEndpoint{fmt.Sprintf("/%s", node.Name), md.JsonResponse})
+	slug := endpointSlugify(node.Name)
+	AddEndpoint(JsonEndpoint{slug, md.JsonResponse})
 	log.Printf("modbus service %s setup OK", node.Name)
 	setupModbus = append(setupModbus, md)
 	return nil
+}
+
+func addMax6675(node Max6675Node) error {
+	m6 := max6675.NewMax6675(node.Name, node.Path, node.Interval)
+	if err := m6.Start(); err != nil {
+		log.Printf("unable to start MAX6675 service %s: %s", node.Name, err)
+		return err
+	}
+	name := endpointSlugify(node.Name)
+	AddEndpoint(JsonEndpoint{name, m6.JsonResponse})
+	return nil
+}
+
+func endpointSlugify(orig string) string {
+	slug := strings.ToLower(orig)
+	slug = strings.ReplaceAll(slug, " ", "_")
+	return "/" + slug
 }

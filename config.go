@@ -28,6 +28,12 @@ type ModbusNode struct {
 	}
 }
 
+type Max6675Node struct {
+	Name     string
+	Path     string
+	Interval int
+}
+
 type ZcanPDO struct {
 	Slug     string
 	Interval byte
@@ -49,9 +55,10 @@ type HttpNode struct {
 }
 
 type ConfigFile struct {
-	Http   HttpNode
-	Zcan   []ZcanNode
-	Modbus []ModbusNode
+	Http    HttpNode
+	Zcan    []ZcanNode
+	Modbus  []ModbusNode
+	Max6675 []Max6675Node
 }
 
 var cfg ConfigFile
