@@ -8,58 +8,6 @@ import (
 	"go.einride.tech/can"
 )
 
-func (dev *ZehnderDevice) processRMIFrame() {
-	var holder *ZehnderRMI
-	dev.wg.Add(1)
-	defer dev.wg.Done()
-
-loop:
-	for {
-		select {
-		case frame := <-dev.rmiQ:
-			rmi := rmiFromFrame(frame)
-			if rmi.DestId != dev.NodeID {
-				if rmi.SourceId == dev.NodeID {
-					continue
-				}
-				log.Printf("Received RMI but it's not for us...%02X vs wanted %02X\n", rmi.DestId, dev.NodeID)
-				log.Printf("FRAME: %v\n", rmi)
-				continue
-			}
-			if rmi.IsMulti {
-				if holder != nil {
-					holder.appendRMI(rmi)
-				} else {
-					holder = rmi
-				}
-				if holder.finalSeen {
-					dev.doRMICallback(holder)
-					holder = nil
-				}
-			} else {
-				dev.doRMICallback(rmi)
-			}
-		case <-dev.stopSignal:
-			break loop
-		}
-	}
-}
-
-func (dev *ZehnderDevice) doRMICallback(rmi *ZehnderRMI) {
-	if dev.rmiCbFn != nil {
-		dev.rmiCbFn(rmi)
-		dev.rmiCbFn = nil
-	} else if dev.defaultRMICbFn != nil {
-		dev.defaultRMICbFn(rmi)
-	} else {
-		log.Println("RMI message received, but no callback was set?")
-	}
-
-	if dev.hasNetwork() {
-		dev.rmiCTS <- true
-	}
-}
-
 type ZehnderTypeFlag byte
 
 const (
@@ -92,6 +40,76 @@ type ZehnderDestination struct {
 	SubUnit    byte
 }
 
+func (dev *ZehnderDevice) processRMIFrame() {
+	var holder *ZehnderRMI
+	dev.wg.Add(1)
+	defer dev.wg.Done()
+
+loop:
+	for {
+		select {
+		case frame := <-dev.rmiQ:
+			rmi := rmiFromFrame(frame)
+			//			log.Printf("RX: %v", frame)
+			if rmi.DestId != dev.NodeID {
+				if rmi.SourceId == dev.NodeID {
+					continue
+				}
+				log.Printf("Received RMI but it's not for us...%02X vs wanted %02X\n", rmi.DestId, dev.NodeID)
+				log.Printf("FRAME: %v\n", rmi)
+				continue
+			}
+			if rmi.IsMulti {
+				if holder != nil {
+					holder.appendRMI(rmi)
+				} else {
+					holder = rmi
+				}
+				if holder.finalSeen {
+					dev.doRMICallback(holder)
+					holder = nil
+				}
+			} else {
+				dev.doRMICallback(rmi)
+			}
+		case <-dev.stopSignal:
+			break loop
+		}
+	}
+}
+
+var errorDescriptions = map[byte]string{
+	11: "Unknown Command",
+	12: "Unknown Unit",
+	13: "Unknown SubUnit",
+	14: "Unknown property",
+	15: "Type can not have a range",
+	30: "Value given not in Range",
+	32: "Property not gettable or settable",
+	40: "Internal error",
+	41: "Internal error, maybe your command is wrong",
+}
+
+func (dev *ZehnderDevice) doRMICallback(rmi *ZehnderRMI) {
+	if rmi.IsError {
+		log.Printf("error response RMI received: src 0x%02x dest 0x%02x seq %d: error code 0x%02x %s",
+			rmi.SourceId, rmi.DestId, rmi.Sequence, rmi.Data[0], errorDescriptions[rmi.Data[0]])
+	}
+	if dev.rmiCbFn != nil {
+		dev.rmiCbFn(rmi)
+		dev.rmiCbFn = nil
+	} else if dev.defaultRMICbFn != nil {
+		log.Println("RMI message received. Processing using default handler")
+		dev.defaultRMICbFn(rmi)
+	} else {
+		log.Println("RMI message received, but no callback was set?")
+	}
+
+	if dev.hasNetwork() {
+		dev.rmiCTS <- true
+	}
+}
+
 func NewZehnderDestination(node byte, unit byte, subunit byte) ZehnderDestination {
 	return ZehnderDestination{node, unit, subunit}
 }
@@ -110,9 +128,6 @@ func (zr ZehnderDestination) GetMultiple(dev *ZehnderDevice, props []byte, flags
 	or_type := byte(flags) | byte(len(props))
 	rmi.Data = append([]byte{0x02, zr.Unit, zr.SubUnit, 1, or_type}, props...)
 	rmi.DataLength = len(rmi.Data)
-	if rmi.DataLength > 8 {
-		rmi.IsMulti = true
-	}
 	rmi.callbackFn = cbFn
 	dev.rmiSequence = (dev.rmiSequence + 1) & 0x03
 	dev.rmiRequestQ <- &rmi
@@ -176,9 +191,33 @@ func (zrmi ZehnderRMI) MakeCANId() uint32 {
 
 func (zrmi *ZehnderRMI) send(dev *ZehnderDevice) error {
 	dev.rmiCbFn = zrmi.callbackFn
+
+	if zrmi.DataLength > 8 {
+		zrmi.IsMulti = true
+		var n byte = 0
+
+		for pos := 0; pos < zrmi.DataLength; pos += 7 {
+			nBytes := min(7, zrmi.DataLength-pos)
+
+			if nBytes < 7 {
+				n += 0x80
+			}
+
+			frame := can.Frame{ID: zrmi.MakeCANId(), IsExtended: true}
+			frameData := append([]byte{n}, zrmi.Data[pos:pos+nBytes]...)
+			copy(frame.Data[:], frameData[:])
+			frame.Length = uint8(nBytes + 1)
+			//			log.Printf("TX %02X: %v", n, frame)
+			dev.txQ <- frame
+			n += 1
+		}
+		return nil
+	}
+
 	frame := can.Frame{ID: zrmi.MakeCANId(), IsExtended: true}
 	copy(frame.Data[:], zrmi.Data[:])
 	frame.Length = uint8(zrmi.DataLength)
+	//	log.Printf("TX: %v", frame)
 	dev.txQ <- frame
 	return nil
 }
@@ -188,7 +227,9 @@ func (zrmi *ZehnderRMI) GetData(typ ZehnderType) (rv any, err error) {
 		err = fmt.Errorf("unable to extract any more data from the RMI data")
 		return
 	}
+
 	data := zrmi.Data[zrmi.readPos:]
+
 	switch typ {
 	case CN_BOOL:
 		rv = data[0] == 1
@@ -196,7 +237,7 @@ func (zrmi *ZehnderRMI) GetData(typ ZehnderType) (rv any, err error) {
 	case CN_STRING:
 		rb := 0
 		var c byte
-		for rb, c = range data[:zrmi.DataLength] {
+		for rb, c = range data {
 			if c == 0 {
 				break
 			}

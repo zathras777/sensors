@@ -22,9 +22,7 @@ type ZehnderDevice struct {
 	NodeID    byte
 	Connected bool
 
-	Model           string
-	SerialNumber    string
-	SoftwareVersion string
+	DeviceInfo *ZehnderDeviceInfo
 
 	connection zConnection
 
@@ -37,7 +35,6 @@ type ZehnderDevice struct {
 	txQ            chan can.Frame
 	heartbeatQ     chan can.Frame
 	rmiRequestQ    chan *ZehnderRMI
-	info_syncer    chan bool
 	rmiCTS         chan bool
 	pdoData        map[int]*PDOValue
 	rmiCbFn        func(*ZehnderRMI)
@@ -48,7 +45,12 @@ type ZehnderDevice struct {
 }
 
 func NewZehnderDevice(id byte) *ZehnderDevice {
-	return &ZehnderDevice{NodeID: id, pdoData: make(map[int]*PDOValue), Name: "Zehnder MVHR"}
+	return &ZehnderDevice{
+		NodeID:     id,
+		pdoData:    make(map[int]*PDOValue),
+		Name:       "Zehnder MVHR",
+		DeviceInfo: NewZehnderDeviceInfo(),
+	}
 }
 
 func (dev *ZehnderDevice) SetDefaultRMICallback(fn func(*ZehnderRMI)) {
@@ -91,37 +93,6 @@ func (dev *ZehnderDevice) Start() error {
 
 func (dev *ZehnderDevice) hasNetwork() bool {
 	return dev.connection.conn != nil
-}
-
-func (dev *ZehnderDevice) storeDeviceInfo(rmi *ZehnderRMI) {
-	tmp, err := rmi.GetData(CN_STRING)
-	if err != nil {
-		log.Printf("unable to get device serial number: %s", err)
-		dev.info_syncer <- false
-		return
-	}
-	dev.SerialNumber = tmp.(string)
-	tmp, err = rmi.GetData(CN_VERSION)
-	if err != nil {
-		log.Printf("unable to get software version from device: %s", err)
-		dev.info_syncer <- false
-		return
-	}
-	dev.SoftwareVersion = tmp.(string)
-	tmp, err = rmi.GetData(CN_STRING)
-	if err != nil {
-		log.Printf("unable to get device model description: %s", err)
-		dev.info_syncer <- false
-		return
-	}
-	dev.Model = tmp.(string)
-	dev.info_syncer <- true
-}
-
-func (dev *ZehnderDevice) getDeviceInfo(syncer chan bool) {
-	dest := NewZehnderDestination(1, 1, 1)
-	dest.GetMultiple(dev, []byte{4, 6, 8}, ZehnderRMITypeActualValue, dev.storeDeviceInfo)
-	dev.info_syncer = syncer
 }
 
 func (dev *ZehnderDevice) Wait() {
@@ -195,19 +166,6 @@ func (dev *ZehnderDevice) JsonResponse() map[string]interface{} {
 	for _, v := range dev.pdoData {
 		dataMap[v.Sensor.slug] = v.GetData()
 	}
-	return dataMap
-}
-
-func (dev *ZehnderDevice) JsonDeviceInfo() map[string]interface{} {
-	if dev.SerialNumber == "" {
-		syncer := make(chan bool)
-		dev.getDeviceInfo(syncer)
-		<-syncer
-	}
-	dataMap := make(map[string]interface{})
-	dataMap["model"] = dev.Model
-	dataMap["serial_number"] = dev.SerialNumber
-	dataMap["software_version"] = dev.SoftwareVersion
 	return dataMap
 }
 
