@@ -66,6 +66,9 @@ func addZcan(node ZcanNode) error {
 	}
 
 	for _, pdo := range node.PDO.PDO {
+		if pdo.Slug == "" {
+			continue
+		}
 		if err := zc.RequestPDOBySlug(node.PDO.Node, pdo.Slug, pdo.Interval); err != nil {
 			log.Printf("unable to add PDO '%s': %s", pdo.Slug, err)
 		}
