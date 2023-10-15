@@ -80,5 +80,8 @@ Content-Length: 181
 - expand the modbus options available
 - add more sensors
 
+## Thanks
+Much of the zcan code here is inspired and shaped by the work done here https://github.com/michaelarnauts/aiocomfoconnect
+
 ## Feedback Welcome!
 This can probably be improved on in many ways, but it's working and is more stable than the python apps it replaces. Happy to have patches or feedback... :-)
