@@ -45,6 +45,12 @@ modbus:
           offset: -100
           factor: 1
           typ: s16
+        ...
+
+max6675:
+  - name: Water Temp
+    path: /dev/spidev0.2
+    interval: 10
 
 ```
 

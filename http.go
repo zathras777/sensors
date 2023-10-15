@@ -31,7 +31,7 @@ func logAvailableEndpoints() {
 }
 
 func startHttpServer(host string, port int) error {
-	log.Printf("Starting HTTP server listening @ http://%s:%d/", host, port)
+	log.Printf("Trying to start HTTP server listening @ http://%s:%d/", host, port)
 	logAvailableEndpoints()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", jsonResponse)
