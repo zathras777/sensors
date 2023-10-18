@@ -131,10 +131,16 @@ type PDOValue struct {
 
 var sensorData = map[int]PDOSensor{
 	16:  {"Device state", "device_state", UNIT_UNKNOWN, CN_UINT8, 0},
+	33:  {"Preset", "preset", UNIT_UNKNOWN, CN_UINT8, 0},
 	49:  {"Operating Mode", "operating_mode", UNIT_UNKNOWN, CN_INT8, 0},
+	54:  {"Supply Fan Mode", "supply_fan_mode", UNIT_UNKNOWN, CN_UINT8, 0},
+	55:  {"Exhaust Fan Mode", "exhaust_fan_mode", UNIT_UNKNOWN, CN_UINT8, 0},
+	56:  {"Manual Mode", "manual_mode", UNIT_UNKNOWN, CN_UINT8, 0},
 	65:  {"Fan Speed Setting", "fan_speed_setting", UNIT_UNKNOWN, CN_INT8, 0},
 	66:  {"Bypass activation mode", "bypass_activation_mode", UNIT_UNKNOWN, CN_UINT8, 0},
 	67:  {"Temperature profile", "temperature_profile", UNIT_UNKNOWN, CN_UINT8, 0},
+	70:  {"Supply Fan Mode", "supply_fan_mode_2", UNIT_UNKNOWN, CN_UINT8, 0},
+	71:  {"Exhaust Fan Mode", "exhaust_fan_mode_2", UNIT_UNKNOWN, CN_UINT8, 0},
 	81:  {"Boost Period Remaining", "boost_period_remaining", UNIT_SECONDS, CN_UINT32, 0},
 	82:  {"Bypass Next Change", "bypass_next_change", UNIT_SECONDS, CN_UINT32, 0},
 	86:  {"Supply Fan Next Change", "supply_fan_next_change", UNIT_SECONDS, CN_UINT32, 0},
@@ -171,6 +177,8 @@ var sensorData = map[int]PDOSensor{
 	292: {"Outdoor Air Humidity", "outdoor_air_humidity", UNIT_PERCENT, CN_UINT8, 0},
 	293: {"Preheated Outdoor Air Humidity", "preheated_outdoor_air_humidity", UNIT_PERCENT, CN_UINT8, 0},
 	294: {"Supply Air Humidity", "supply_air_humidity", UNIT_PERCENT, CN_INT8, 0},
+	305: {"??? Supply CO2", "supply_co2", UNIT_UNKNOWN, CN_UINT8, 0},
+	306: {"?? Exhaust CO2", "exhaust_co2", UNIT_UNKNOWN, CN_UINT8, 0},
 }
 
 func findSensor(pdo int, dataLen int) PDOSensor {
