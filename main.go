@@ -142,6 +142,8 @@ func addMax6675(node Max6675Node) error {
 	}
 	name := endpointSlugify(node.Name)
 	AddEndpoint(JsonEndpoint{name, m6.JsonResponse})
+	log.Printf("MAX6675 service %s setup OK", node.Name)
+	setupMax6675 = append(setupMax6675, m6)
 	return nil
 }
 
