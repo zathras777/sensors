@@ -20,7 +20,12 @@ type Max6675Device struct {
 }
 
 func NewMax6675(name string, path string, interval int) *Max6675Device {
-	return &Max6675Device{Name: name, DevicePath: path, Interval: interval}
+	return &Max6675Device{
+		Name:        name,
+		DevicePath:  path,
+		Interval:    interval,
+		stopChannel: make(chan bool, 1),
+	}
 }
 
 func (m6 *Max6675Device) Start() error {
@@ -70,6 +75,7 @@ func (m6 *Max6675Device) readValue() (err error) {
 
 	n, err := m6.fh.Read(raw)
 	if err != nil {
+		log.Printf("unable to read value from %s: %v", m6.DevicePath, err)
 		return err
 	}
 	if n != 2 {
