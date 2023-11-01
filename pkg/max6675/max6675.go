@@ -3,8 +3,9 @@ package max6675
 import (
 	"fmt"
 	"log"
-	"os"
 	"time"
+
+	"github.com/ecc1/spi"
 )
 
 type Max6675Device struct {
@@ -15,7 +16,7 @@ type Max6675Device struct {
 	Value float64
 
 	valueAvail  bool
-	fh          *os.File
+	spiDev      *spi.Device
 	stopChannel chan bool
 }
 
@@ -56,8 +57,9 @@ func (m6 *Max6675Device) Start() error {
 			}
 		}
 		ticker.Stop()
-		m6.fh.Close()
+		m6.spiDev.Close()
 	}()
+
 	return nil
 }
 
@@ -66,20 +68,24 @@ func (m6 *Max6675Device) Stop() {
 }
 
 func (m6 *Max6675Device) openDevice() (err error) {
-	m6.fh, err = os.Open(m6.DevicePath)
+	m6.spiDev, err = spi.Open(m6.DevicePath, 3900000, 0)
+
+	m6.spiDev.SetMode(0)
+	m6.spiDev.SetBitsPerWord(8)
+	m6.spiDev.SetLSBFirst(false)
+	m6.spiDev.SetMaxSpeed(3900000)
+
 	return
 }
 
 func (m6 *Max6675Device) readValue() (err error) {
 	raw := []byte{0, 0}
 
-	n, err := m6.fh.Read(raw)
+	err = m6.spiDev.Transfer(raw, raw)
+
 	if err != nil {
 		log.Printf("unable to read value from %s: %v", m6.DevicePath, err)
 		return err
-	}
-	if n != 2 {
-		return fmt.Errorf("tried to read 2 bytes, actually read %d", n)
 	}
 	val := uint16(raw[0])<<8 | uint16(raw[1])
 	if val&0x04 == 0x04 {

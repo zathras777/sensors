@@ -3,12 +3,14 @@ module github.com/zathras777/sensors
 go 1.21.1
 
 require (
+	github.com/ecc1/spi v0.0.0-20230226182530-b0f4c20d714a
 	github.com/goburrow/modbus v0.1.0
 	go.einride.tech/can v0.7.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
+	github.com/ecc1/gpio v0.0.0-20200212231225-d40e43fcf8f5 // indirect
 	github.com/goburrow/serial v0.1.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
