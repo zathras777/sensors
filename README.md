@@ -64,8 +64,15 @@ The server creates a simple webserver that serves data from all configured servi
 
 
 ```logfile
-2023/10/14 16:43:11 Starting HTTP server listening @ http://10.0.73.216:7001/
-2023/10/14 16:43:11 available endpoints: /mvhr, /mvhr/device-info, /t300
+
+2023/11/01 17:09:48 Started HTTP Sensors Service.
+2023/11/01 17:09:48 Starting network services
+2023/11/01 17:09:48 zcan service mvhr setup OK
+2023/11/01 17:09:48 modbus service t300 setup OK
+2023/11/01 17:09:48 MAX6675 service RecircTemp setup OK
+2023/11/01 17:09:48 Trying to start HTTP server listening @ http://10.0.xxx.xxx:7001/
+2023/11/01 17:09:48 available endpoints: /mvhr, /mvhr/device-info, /recirctemp, /t300
+2023/11/01 17:09:49 unknown sensor 0x1a2 [418] 1 bytes of data
 ```
 
 The data is served as JSON.
@@ -81,10 +88,14 @@ Content-Length: 181
 {"A":1,...
 ```
 
+## zcan Requirements
+The zcan sensor uses the linux socketcan interface to read/write to the device. This needs to have the bitrate set and the interface brought UP - both of which need root level access. If using this sensor then the app needs to be run as root.
+
 ## ToDo
 - add logging options
 - expand the modbus options available
 - add more sensors
+- look at running as non-root
 
 ## Thanks
 Much of the zcan code here is inspired and shaped by the work done here https://github.com/michaelarnauts/aiocomfoconnect
