@@ -61,6 +61,10 @@ func (dev *ZehnderDevice) Connect(interfaceName string) error {
 	return dev.connection.open_device(interfaceName)
 }
 
+func (dev *ZehnderDevice) Disconnect() error {
+	return dev.connection.close_device()
+}
+
 func (dev *ZehnderDevice) Start() error {
 	dev.stopSignal = make(chan bool, 2)
 	dev.frameQ = make(chan can.Frame)

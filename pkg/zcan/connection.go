@@ -3,6 +3,7 @@ package zcan
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 
 	"go.einride.tech/can/pkg/candevice"
@@ -13,6 +14,7 @@ type zConnection struct {
 	interfaceName string
 	device        *candevice.Device
 	counter       int
+	prevState     bool
 	conn          net.Conn
 }
 
@@ -33,19 +35,25 @@ func (conn *zConnection) open_device(interfaceName string) error {
 			return err
 		}
 	}
-	var ck bool
-	ck, err = d.IsUp()
+	conn.prevState, err = d.IsUp()
 	if err != nil {
 		return err
 	}
-	if !ck {
+	if !conn.prevState {
 		err = d.SetUp()
 		if err != nil {
+			log.Printf("unable to bring %s interface UP. %v", interfaceName, err)
 			return err
 		}
 	}
 	conn.device = d
-	defer d.SetDown()
+	return nil
+}
+
+func (conn *zConnection) close_device() error {
+	if !conn.prevState {
+		return conn.device.SetDown()
+	}
 	return nil
 }
 

@@ -71,6 +71,10 @@ func main() {
 	}()
 	<-waiter
 	log.Print("closing down")
+
+	for _, zc := range setupZcan {
+		zc.Disconnect()
+	}
 }
 
 func addZcan(node ZcanNode) error {
